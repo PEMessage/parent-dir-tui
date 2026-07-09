@@ -1,0 +1,26 @@
+#!/bin/bash
+
+
+mkdir -p fzy
+
+version="34b88869d022e861da4846c4463aea3ddfb3ff30"
+
+if [ ! -f "fzy/tty.c" ] ; then
+    wget "https://raw.githubusercontent.com/jhawthorn/fzy/$version/src/tty.c" -O fzy/tty.c
+fi
+
+if [ ! -f "fzy/tty.h" ] ; then
+    wget "https://raw.githubusercontent.com/jhawthorn/fzy/$version/src/tty.h" -O fzy/tty.h
+fi
+
+if [ ! -f "config.h" ] ; then
+    wget "https://raw.githubusercontent.com/jhawthorn/fzy/$version/src/config.def.h" -O config.h
+fi
+
+gcc \
+    -static -Os \
+    -flto \
+    -ffunction-sections -fdata-sections \
+    -Wl,--strip-all,--gc-sections \
+    main.c fzy/tty.c -Ifzy -o parent_dir_tui
+./parent_dir_tui "$@"
