@@ -232,7 +232,7 @@ void tui_ttyinit(tui_state_t *state) {
 }
 
 void tui_pathinit(tui_state_t *state, const char* filepath, long initial_idx) {
-    state->parts = split(filepath, "/");
+    state->parts = split(filepath, "/\\");
     assert(state->parts.count > 0);
 
     if (initial_idx < 0) {
@@ -256,7 +256,7 @@ void draw(tui_state_t *state) {
         const char *delim;
         const char *content;
         if (i != state->parts.count - 1) {
-            delim = "/";
+            delim = get_sep();
         } else {
             delim = "";
         }
@@ -367,6 +367,13 @@ void tui_pathcleanup(tui_state_t *state) {
     nob_da_free(state->parts);
 }
 
+static int is_root_component(const char *s, int idx) {
+    if (s[0] == '\0') return (idx == 0);
+    if ((s[0] >= 'A' && s[0] <= 'Z') && s[1] == ':' && s[2] == '\0') return 1;
+    if ((s[0] >= 'a' && s[0] <= 'z') && s[1] == ':' && s[2] == '\0') return 1;
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 4) {
         fprintf(stderr, "Usage: %s <offset> <ctx> <pwd>\n", argv[0]);
@@ -401,7 +408,7 @@ int main(int argc, char *argv[]) {
     }
 
     // === highlight index: pwd depth + offset ===
-    tokens_t pwd_parts = split(pwd, "/");
+    tokens_t pwd_parts = split(pwd, "/\\");
     long highlight_idx = (long)pwd_parts.count - 1 + offset;
     nob_da_foreach(char *, it, &pwd_parts) free(*it);
     nob_da_free(pwd_parts);
@@ -417,15 +424,14 @@ int main(int argc, char *argv[]) {
     tui_ttycleanup(&state);
 
     if (exit_code == 0) {
-        if (state.highlight_idx == 0 && state.parts.items[0][0] == '\0') {
-            printf("/\t%s\n", new_ctx);
-        } else {
-            for (size_t i = 0; i <= state.highlight_idx; i++) {
-                printf("%s", state.parts.items[i]);
-                if (i != state.highlight_idx) printf("/");
-            }
-            printf("\t%s\n", new_ctx);
+        for (size_t i = 0; i <= state.highlight_idx; i++) {
+            printf("%s", state.parts.items[i]);
+            if (i != state.highlight_idx) printf("%s", get_sep());
         }
+        if (is_root_component(state.parts.items[state.highlight_idx], (int)state.highlight_idx)) {
+            printf("%s", get_sep());
+        }
+        printf("\t%s\n", new_ctx);
     }
 
     tui_pathcleanup(&state);

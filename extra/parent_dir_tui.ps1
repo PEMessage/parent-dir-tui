@@ -34,5 +34,5 @@ function Invoke-ParentDirTuiRight {
 }
 
 # Bind Alt+Left and Alt+Right
-Set-PSReadLineKeyHandler -Chord "Alt+Left" -ScriptBlock { Invoke-ParentDirTuiLeft }
-Set-PSReadLineKeyHandler -Chord "Alt+Right" -ScriptBlock { Invoke-ParentDirTuiRight }
+Set-PSReadLineKeyHandler -Chord "Alt+LeftArrow" -ScriptBlock { Invoke-ParentDirTuiLeft }
+Set-PSReadLineKeyHandler -Chord "Alt+RightArrow" -ScriptBlock { Invoke-ParentDirTuiRight }

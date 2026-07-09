@@ -142,6 +142,10 @@ void tty_show_cursor(tty_t *tty) {
 	tty_printf(tty, "\x1b[?25h");
 }
 
+const char *get_sep(void) {
+	return "/";
+}
+
 static void tty_sgr(tty_t *tty, int code) {
 	tty_printf(tty, "\x1b[%im", code);
 }
