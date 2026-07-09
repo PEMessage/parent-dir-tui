@@ -227,7 +227,6 @@ typedef struct {
 
     // options
     bool do_exit :1;
-    bool do_print :1;
 
     uint8_t exit_code;
 
@@ -245,13 +244,12 @@ void tui_pathinit(tui_state_t *state, const char* filepath, long initial_idx) {
     state->parts = split(filepath, "/");
     assert(state->parts.count > 0);
 
-    #define POS_MOD(i, n) ((((i) % (n) + (n)) % (n)))
-    if (initial_idx >= (int)state->parts.count) {
+    if (initial_idx < 0) {
+        state->highlight_idx = 0;
+    } else if (initial_idx >= (long)state->parts.count) {
         state->highlight_idx = state->parts.count - 1;
-    } else if (initial_idx < 0) {
-        state->highlight_idx = POS_MOD(initial_idx, (int)(state->parts.count));
     } else {
-        state->highlight_idx = initial_idx;
+        state->highlight_idx = (size_t)initial_idx;
     }
 }
 
@@ -330,7 +328,6 @@ void onEnter(const struct keymap_ *keymap, void *userdata) {
     tui_state_t *state = (tui_state_t *)userdata;
     state->do_exit = 1;
     state->exit_code = 0;
-    state->do_print = 1;
 }
 
 void onLeftArrow(const struct keymap_ *keymap, void *userdata) {
@@ -374,15 +371,6 @@ void tui_ttycleanup(tui_state_t *state) {
 }
 
 void tui_pathcleanup(tui_state_t *state) {
-    if (state->do_print) {
-        for (size_t i = 0; i <= state->highlight_idx; i++) {
-            printf("%s", state->parts.items[i]);
-            if (i != state->highlight_idx) {
-                printf("/");
-            }
-        }
-        printf("\n");
-    }
     nob_da_foreach(char *, it, &state->parts) {
         free(*it);
     }
@@ -390,34 +378,66 @@ void tui_pathcleanup(tui_state_t *state) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2 || strlen(argv[1]) == 0) {
-        fprintf(stderr, "Usage: %s <filepath> [initial_idx]\n", argv[0]);
-        exit(1);
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s <offset> <ctx> <pwd>\n", argv[0]);
+        fprintf(stderr, "  offset: -1 (left/parent), +1 (right/child)\n");
+        fprintf(stderr, "  ctx: opaque context string (use \"\" for first call)\n");
+        fprintf(stderr, "  pwd: current working directory\n");
+        return 1;
     }
 
-    const char* filepath = argv[1];
-
-    // If argv[2] exist and is a number,
-    long initial_idx = -2;
-    if (argc > 2) {
-        char *endptr;
-        long maybe_idx = strtol(argv[2], &endptr, 10);
-        // check all char are consume, which mean parse success
-        if (strlen(argv[2]) == (size_t)(endptr - argv[2])) {
-            initial_idx = maybe_idx;
-        }
+    long offset = strtol(argv[1], NULL, 10);
+    if (offset != -1 && offset != 1) {
+        fprintf(stderr, "Error: offset must be -1 or +1\n");
+        return 1;
     }
 
+    const char *ctx = argv[2];
+    const char *pwd = argv[3];
+
+    // === ctx / display_path decision ===
+    // Update ctx only when pwd is NOT a prefix of ctx.
+    // ctx is opaque to the shell — we just output it back as new_ctx.
+    const char *display_path;
+    const char *new_ctx;
+    size_t pwd_len = strlen(pwd);
+
+    if (ctx[0] == '\0' || strncmp(ctx, pwd, pwd_len) != 0) {
+        display_path = pwd;
+        new_ctx     = pwd;
+    } else {
+        display_path = ctx;
+        new_ctx     = ctx;
+    }
+
+    // === highlight index: pwd depth + offset ===
+    tokens_t pwd_parts = split(pwd, "/");
+    long highlight_idx = (long)pwd_parts.count - 1 + offset;
+    nob_da_foreach(char *, it, &pwd_parts) free(*it);
+    nob_da_free(pwd_parts);
+
+    // === TUI ===
     tui_state_t state;
     memset(&state, 0, sizeof(state));
 
-    tui_pathinit(&state, filepath, initial_idx);
+    tui_pathinit(&state, display_path, highlight_idx);
     tui_ttyinit(&state);
 
     int exit_code = tui_run(&state);
     tui_ttycleanup(&state);
+
+    if (exit_code == 0) {
+        if (state.highlight_idx == 0 && state.parts.items[0][0] == '\0') {
+            printf("/\t%s\n", new_ctx);
+        } else {
+            for (size_t i = 0; i <= state.highlight_idx; i++) {
+                printf("%s", state.parts.items[i]);
+                if (i != state.highlight_idx) printf("/");
+            }
+            printf("\t%s\n", new_ctx);
+        }
+    }
+
     tui_pathcleanup(&state);
-
-
     return exit_code;
 }
