@@ -2,8 +2,17 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <io.h>
+#include <fcntl.h>
 
 #include "tty.h"
+
+#ifndef ENABLE_VIRTUAL_TERMINAL_INPUT
+#define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
+#endif
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
 
 struct tty_t {
 	HANDLE hin;
@@ -58,7 +67,7 @@ void tty_init(tty_t *tty) {
 	                     GetCurrentProcess(), &hout_copy,
 	                     0, FALSE, DUPLICATE_SAME_ACCESS))
 		exit(EXIT_FAILURE);
-	int out_fd = _open_osfhandle((intptr_t)hout_copy, 0);
+	int out_fd = _open_osfhandle((intptr_t)hout_copy, _O_WRONLY);
 	if (out_fd == -1) exit(EXIT_FAILURE);
 	tty->fout = _fdopen(out_fd, "w");
 	if (!tty->fout) exit(EXIT_FAILURE);

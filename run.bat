@@ -1,20 +1,20 @@
 @echo off
-:: Windows build & run script (MinGW / MSYS2)
-:: Requires: gcc, wget
+:: Windows build & run script (MSVC)
+:: Usage: run.bat [offset] [ctx] [pwd]
 
-if not exist fzy mkdir fzy
-
-set VERSION=34b88869d022e861da4846c4463aea3ddfb3ff30
-
-if not exist "config.h" (
-    wget "https://raw.githubusercontent.com/jhawthorn/fzy/%VERSION%/src/config.def.h" -O config.h
+where cl >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo Error: MSVC compiler (cl.exe) not found in PATH.
+    echo Run this script from a Visual Studio Developer Command Prompt
+    echo or call "vcvarsall.bat x64" first.
+    exit /b 1
 )
 
-gcc ^
-    -static -Os ^
-    -flto ^
-    -ffunction-sections -fdata-sections ^
-    -Wl,--strip-all,--gc-sections ^
-    main.c fzy/tty_win32.c -Ifzy -o parent_dir_tui.exe
+cl /nologo /O2 /MT ^
+   /Fe:parent_dir_tui.exe ^
+   main.c fzy/tty_win32.c ^
+   /I fzy
+
+if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
 
 parent_dir_tui.exe %*
