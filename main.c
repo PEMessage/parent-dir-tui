@@ -9,15 +9,6 @@
 #include "config.h"
 
 
-// hiden api, copy from tty.c
-// ==============================================
-static void tty_hide_cursor(tty_t *tty) {
-	tty_printf(tty, "%c%c%c%i%c", 0x1b, '[', '?', 25, 'l');
-}
-
-static void tty_show_cursor(tty_t *tty) {
-	tty_printf(tty, "%c%c%c%i%c", 0x1b, '[', '?', 25, 'h');
-}
 // nob.h enpower
 // ==============================================
 #define NOB_ASSERT assert
@@ -235,8 +226,8 @@ typedef struct {
 
 
 void tui_ttyinit(tui_state_t *state) {
-    state->tty = (tty_t *)malloc(sizeof(tty_t));
-    tty_init(state->tty, "/dev/tty");
+    state->tty = tty_create();
+    tty_init(state->tty);
     tty_hide_cursor(state->tty);
 }
 
@@ -366,8 +357,7 @@ void tui_ttycleanup(tui_state_t *state) {
     tty_setcol(state->tty, 0);
     tty_clearline(state->tty);
     tty_flush(state->tty);
-    tty_reset(state->tty);
-    free(state->tty);
+    tty_destroy(state->tty);
 }
 
 void tui_pathcleanup(tui_state_t *state) {

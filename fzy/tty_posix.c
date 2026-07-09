@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
@@ -10,30 +11,43 @@
 
 #include "tty.h"
 
-#include "../config.h"
+#define TTY_DEVICE "/dev/tty"
 
-void tty_reset(tty_t *tty) {
-	tcsetattr(tty->fdin, TCSANOW, &tty->original_termios);
+struct tty_t {
+	int fdin;
+	FILE *fout;
+	struct termios original_termios;
+	int fgcolor;
+	size_t maxwidth;
+	size_t maxheight;
+};
+
+tty_t *tty_create(void) {
+	tty_t *tty = malloc(sizeof(tty_t));
+	if (!tty) exit(EXIT_FAILURE);
+	memset(tty, 0, sizeof(*tty));
+	return tty;
 }
 
-void tty_close(tty_t *tty) {
-	tty_reset(tty);
+void tty_destroy(tty_t *tty) {
+	tcsetattr(tty->fdin, TCSANOW, &tty->original_termios);
 	fclose(tty->fout);
 	close(tty->fdin);
+	free(tty);
 }
 
 static void handle_sigwinch(int sig){
 	(void)sig;
 }
 
-void tty_init(tty_t *tty, const char *tty_filename) {
-	tty->fdin = open(tty_filename, O_RDONLY);
+void tty_init(tty_t *tty) {
+	tty->fdin = open(TTY_DEVICE, O_RDONLY);
 	if (tty->fdin < 0) {
 		perror("Failed to open tty");
 		exit(EXIT_FAILURE);
 	}
 
-	tty->fout = fopen(tty_filename, "w");
+	tty->fout = fopen(TTY_DEVICE, "w");
 	if (!tty->fout) {
 		perror("Failed to open tty");
 		exit(EXIT_FAILURE);
@@ -51,13 +65,6 @@ void tty_init(tty_t *tty, const char *tty_filename) {
 
 	struct termios new_termios = tty->original_termios;
 
-	/*
-	 * Disable all of
-	 * ICANON  Canonical input (erase and kill processing).
-	 * ECHO    Echo.
-	 * ISIG    Signals from control characters
-	 * ICRNL   Conversion of CR characters into NL
-	 */
 	new_termios.c_iflag &= ~(ICRNL);
 	new_termios.c_lflag &= ~(ICANON | ECHO | ISIG);
 
@@ -89,7 +96,6 @@ char tty_getchar(tty_t *tty) {
 		perror("error reading from tty");
 		exit(EXIT_FAILURE);
 	} else if (size == 0) {
-		/* EOF */
 		exit(EXIT_FAILURE);
 	} else {
 		return ch;
@@ -128,8 +134,16 @@ int tty_input_ready(tty_t *tty, long int timeout, int return_on_signal) {
 	}
 }
 
+void tty_hide_cursor(tty_t *tty) {
+	tty_printf(tty, "\x1b[?25l");
+}
+
+void tty_show_cursor(tty_t *tty) {
+	tty_printf(tty, "\x1b[?25h");
+}
+
 static void tty_sgr(tty_t *tty, int code) {
-	tty_printf(tty, "%c%c%im", 0x1b, '[', code);
+	tty_printf(tty, "\x1b[%im", code);
 }
 
 void tty_setfg(tty_t *tty, int fg) {
@@ -153,27 +167,27 @@ void tty_setnormal(tty_t *tty) {
 }
 
 void tty_setnowrap(tty_t *tty) {
-	tty_printf(tty, "%c%c?7l", 0x1b, '[');
+	tty_printf(tty, "\x1b[?7l");
 }
 
 void tty_setwrap(tty_t *tty) {
-	tty_printf(tty, "%c%c?7h", 0x1b, '[');
+	tty_printf(tty, "\x1b[?7h");
 }
 
 void tty_newline(tty_t *tty) {
-	tty_printf(tty, "%c%cK\n", 0x1b, '[');
+	tty_printf(tty, "\x1b[K\n");
 }
 
 void tty_clearline(tty_t *tty) {
-	tty_printf(tty, "%c%cK", 0x1b, '[');
+	tty_printf(tty, "\x1b[K");
 }
 
 void tty_setcol(tty_t *tty, int col) {
-	tty_printf(tty, "%c%c%iG", 0x1b, '[', col + 1);
+	tty_printf(tty, "\x1b[%iG", col + 1);
 }
 
 void tty_moveup(tty_t *tty, int i) {
-	tty_printf(tty, "%c%c%iA", 0x1b, '[', i);
+	tty_printf(tty, "\x1b[%iA", i);
 }
 
 void tty_printf(tty_t *tty, const char *fmt, ...) {

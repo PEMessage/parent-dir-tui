@@ -16,7 +16,6 @@ extern "C" {
 /* Time (in ms) to wait for additional bytes of an escape sequence */
 #define KEYTIMEOUT 25
 
-#define DEFAULT_TTY "/dev/tty"
 #define DEFAULT_PROMPT "> "
 #define DEFAULT_NUM_LINES 10
 #define DEFAULT_WORKERS 0
